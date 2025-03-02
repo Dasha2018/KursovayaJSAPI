@@ -1,25 +1,30 @@
-// Замени на свой, чтобы получить независимый от других набор данных.
-// "боевая" версия инстапро лежит в ключе prod
-const personalKey = "prod";
-const baseHost = "https://webdev-hw-api.vercel.app";
+const personalKey = "daria-2025";
+const baseHost = "https://wedev-api.sky.pro";
 const postsHost = `${baseHost}/api/v1/${personalKey}/instapro`;
 
 export function getPosts({ token }) {
   return fetch(postsHost, {
     method: "GET",
     headers: {
-      Authorization: token,
+      Authorization: `Bearer ${token}`,
     },
   })
     .then((response) => {
       if (response.status === 401) {
         throw new Error("Нет авторизации");
       }
+      if (!response.ok) {
+        throw new Error("Ошибка при получении постов");
+      }
 
       return response.json();
     })
     .then((data) => {
-      return data.posts;
+      console.log("Данные с API:", data);
+      return data.posts.map((post) => ({
+        ...post,
+        text: post.text || post.description,
+      }));
     });
 }
 
@@ -47,15 +52,20 @@ export function loginUser({ login, password }) {
       login,
       password,
     }),
-  }).then((response) => {
-    if (response.status === 400) {
-      throw new Error("Неверный логин или пароль");
-    }
-    return response.json();
-  });
+  })
+    .then((response) => {
+      if (response.status === 400) {
+        throw new Error("Неверный логин или пароль");
+      }
+      return response.json();
+    })
+    .then((data) => {
+      // Сохраняем токен в localStorage
+      localStorage.setItem("authToken", data.token);
+      return data;
+    });
 }
 
-// Загружает картинку в облако, возвращает url загруженной картинки
 export function uploadImage({ file }) {
   const data = new FormData();
   data.append("file", file);
@@ -64,6 +74,30 @@ export function uploadImage({ file }) {
     method: "POST",
     body: data,
   }).then((response) => {
+    if (!response.ok) {
+      throw new Error("Ошибка при загрузке изображения");
+    }
+    return response.json();
+  });
+}
+
+export function addPost({ description, imageUrl, token }) {
+  return fetch(postsHost, {
+    method: "POST",
+    headers: {
+      Authorization: token,
+    },
+    body: JSON.stringify({
+      description,
+      imageUrl,
+    }),
+  }).then((response) => {
+    if (!response.ok) {
+      return response.json().then((data) => {
+        console.error("Ошибка от API:", data);
+        throw new Error(data.error || "Ошибка при добавлении поста");
+      });
+    }
     return response.json();
   });
 }

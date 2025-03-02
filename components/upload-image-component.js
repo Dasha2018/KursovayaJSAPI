@@ -1,9 +1,12 @@
+import { uploadImage } from "../api.js";
+import { renderHeaderComponent } from "./header-component.js";
+
 /**
  * Компонент загрузки изображения.
  * Этот компонент позволяет пользователю загружать изображение и отображать его превью.
  * Если изображение уже загружено, пользователь может заменить его.
  *
- * @param {HTMLElement} params.element - HTML-элемент, в который будет рендериться компонент.
+ * @param {HTMLElement} params.element - HTML-элемент, Это элемент, в который будет рендериться компонент загрузки изображения.
  * @param {Function} params.onImageUrlChange - Функция, вызываемая при изменении URL изображения.
  *                                            Принимает один аргумент - новый URL изображения или пустую строку.
  */
@@ -17,11 +20,18 @@ export function renderUploadImageComponent({ element, onImageUrlChange }) {
 
   /**
    * Функция рендеринга компонента.
-   * Отображает интерфейс компонента в зависимости от состояния: 
+   * Отображает интерфейс компонента в зависимости от состояния:
    * либо форма выбора файла, либо превью загруженного изображения с кнопкой замены.
    */
+
+  /* renderHeaderComponent({
+    element: document.querySelector(".header-container"),
+  }); */
   const render = () => {
     element.innerHTML = `
+
+    
+    
       <div class="upload-image">
         ${
           imageUrl
@@ -44,6 +54,9 @@ export function renderUploadImageComponent({ element, onImageUrlChange }) {
         }
       </div>
     `;
+    renderHeaderComponent({
+      element: document.querySelector(".header-container"),
+    });
 
     // Обработчик выбора файла
     const fileInputElement = element.querySelector(".file-upload-input");
@@ -53,7 +66,7 @@ export function renderUploadImageComponent({ element, onImageUrlChange }) {
         const labelEl = document.querySelector(".file-upload-label");
         labelEl.setAttribute("disabled", true);
         labelEl.textContent = "Загружаю файл...";
-        
+
         // Загружаем изображение с помощью API
         uploadImage({ file }).then(({ fileUrl }) => {
           imageUrl = fileUrl; // Сохраняем URL загруженного изображения
