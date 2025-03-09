@@ -1,8 +1,8 @@
-import { getPosts } from "../api.js";
 import { renderHeaderComponent } from "./header-component.js";
+import { getToken, posts } from "../index.js";
+import { setLike, removeLike, getPosts } from "../api";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale/ru";
-import { goToPage, getToken } from "../index.js";
 
 export function renderUserPostsPageComponent({ appEl, userId, user }) {
   appEl.innerHTML = "Загрузка постов...";
@@ -15,23 +15,24 @@ export function renderUserPostsPageComponent({ appEl, userId, user }) {
 
       const postsHtml = userPosts
         .map((post) => {
+          post.likes = post.likes || {};
           post.likes.counter = Number(post.likes.counter) || 0;
+          post.isLiked = post.isLiked || false;
 
           return `
-              <li class="post">
+              <li class="post" data-post-id="${post.id}">
                 <div class="post-header" data-user-id="${post.user.id}">
-                    <img src="${
-                      post.user.imageUrl
-                    }" class="post-header__user-image" alt="${post.user.name}">
+                    <img src="${post.user.imageUrl}" 
+                         class="post-header__user-image" 
+                         alt="${post.user.name}">
                     <p class="post-header__user-name">${post.user.name}</p>
                 </div>
                 <div class="post-image-container">
-                  <img class="post-image" src="${
-                    post.imageUrl
-                  }" alt="Изображение поста">
+                  <img class="post-image" src="${post.imageUrl}" 
+                       alt="Изображение поста">
                 </div>
                 <div class="post-likes">
-                  <button data-post-id="${post.id}" class="like-button">
+                  <button class="like-button">
                     <img src="./assets/images/${
                       post.isLiked ? "like-active" : "like-not-active"
                     }.svg" alt="Кнопка лайка">
@@ -68,14 +69,68 @@ export function renderUserPostsPageComponent({ appEl, userId, user }) {
         user,
       });
 
-      document.querySelectorAll(".post-header").forEach((userEl) => {
-        userEl.addEventListener("click", () => {
-          goToPage(USER_POSTS_PAGE, { userId: userEl.dataset.userId });
+      // Функция обновления UI лайков
+      function updatePostLikes(postId) {
+        const post = posts.find((p) => p.id === postId);
+        if (!post) return;
+
+        const postElement = document.querySelector(
+          `[data-post-id='${postId}']`
+        );
+        if (!postElement) return;
+
+        const likeButton = postElement.querySelector(".like-button");
+        const likeText = postElement.querySelector(".post-likes-text");
+
+        likeButton.querySelector("img").src = `./assets/images/${
+          post.isLiked ? "like-active" : "like-not-active"
+        }.svg`;
+
+        const likedUsers = post.likes.users.length
+          ? `: ${post.likes.users.join(", ")}`
+          : "";
+        likeText.textContent = `Нравится: ${post.likes.counter}${likedUsers}`;
+      }
+      // Обработчик кликов на лайк
+      document.querySelectorAll(".like-button").forEach((likeButton) => {
+        likeButton.addEventListener("click", async (event) => {
+          event.stopPropagation(); // Предотвращаем всплытие
+
+          const postElement = event.target.closest(".post");
+          if (!postElement) return;
+
+          const postId = postElement.dataset.postId;
+          const token = getToken();
+
+          if (!token) {
+            alert("Вы не авторизованы. Войдите в систему.");
+            return;
+          }
+
+          try {
+            const post = userPosts.find((p) => p.id == postId);
+            if (!post) return;
+
+            if (post.isLiked) {
+              await removeLike(postId, token);
+              post.isLiked = false;
+              post.likes.counter = Math.max(0, post.likes.counter - 1);
+            } else {
+              await setLike(postId, token);
+              post.isLiked = true;
+              post.likes.counter += 1;
+            }
+            getPosts();
+            renderUserPostsPageComponent();
+            updatePostLikes(postId);
+          } catch (error) {
+            console.error("Ошибка обновления лайков:", error.message);
+          }
         });
       });
     })
     .catch((error) => {
-      console.error("Ошибка загрузки постов пользователя:", error);
+      console.error("Ошибка загрузки постов:", error);
       appEl.innerHTML = "Ошибка при загрузке постов.";
     });
 }

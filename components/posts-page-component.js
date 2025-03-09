@@ -12,9 +12,9 @@ import { setLike, removeLike } from "../api";
 export function renderPostsPageComponent({ appEl }) {
   const postsHtml = posts
     .map((post) => {
-      post.likes = post.likes || {};
-      post.likes.counter = Number(post.likes.counter) || 0;
+      // Важно: инициализируем isLiked и counter, если их нет
       post.isLiked = post.isLiked || false;
+      post.likes.counter = post.likes.counter || 0;
 
       return `
         <li class="post" data-post-id="${post.id}">
@@ -73,45 +73,52 @@ export function renderPostsPageComponent({ appEl }) {
 
   function updatePostLikes(postId) {
     const post = posts.find((p) => p.id === postId);
-    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+    if (!post) return;
+
+    const postElement = document.querySelector(`[data-post-id='${postId}']`);
+    if (!postElement) return;
+
     const likeButton = postElement.querySelector(".like-button");
     const likeText = postElement.querySelector(".post-likes-text");
 
-    if (!postElement || !likeButton || !likeText) return;
-
-    // Обновляем картинку лайка
     likeButton.querySelector("img").src = `./assets/images/${
       post.isLiked ? "like-active" : "like-not-active"
     }.svg`;
 
-    // Обновляем количество лайков
-    likeText.innerHTML = `Нравится: <strong>${post.likes.counter}</strong>`;
+    const likedUsers = post.likes.users.length
+      ? `: ${post.likes.users.join(", ")}`
+      : "";
+    likeText.textContent = `Нравится: ${post.likes.counter}${likedUsers}`;
   }
 
   // Обработчик кликов на кнопки лайков
   for (let likeButton of document.querySelectorAll(".like-button")) {
     likeButton.addEventListener("click", async (event) => {
-      const postId = event.target.closest(".post").dataset.postId;
+      event.stopPropagation();
+      const postId = likeButton.dataset.postId;
       const token = getToken();
-
       if (!token) {
         alert("Вы не авторизованы. Пожалуйста, войдите в систему.");
         return;
       }
 
       try {
-        const post = posts.find((p) => p.id === postId);
+        let post = posts.find((p) => p.id === postId);
         if (!post) return;
 
+        let updatedPost;
         if (post.isLiked) {
-          await removeLike(postId, token); // Удаляем лайк
-          post.isLiked = false;
-          post.likes.counter = Math.max(0, post.likes.counter - 1); // Предотвращаем уход в минус
+          updatedPost = await removeLike(postId, token);
         } else {
-          await setLike(postId, token); // Добавляем лайк
-          post.isLiked = true;
-          post.likes.counter += 1;
+          updatedPost = await setLike(postId, token);
         }
+
+        // Обновляем пост с сервера
+        post.isLiked = updatedPost.likes.some(
+          (like) => like.user.id === getUserId()
+        );
+        post.likes.counter = updatedPost.likes.length;
+        post.likes.users = updatedPost.likes.map((like) => like.user.name);
 
         updatePostLikes(postId);
       } catch (error) {

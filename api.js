@@ -2,33 +2,39 @@ const personalKey = "daria-2025";
 const baseHost = "https://wedev-api.sky.pro";
 const postsHost = `${baseHost}/api/v1/${personalKey}/instapro`;
 
-export function getPosts({ token }) {
-  return fetch(postsHost, {
+export async function getPosts({ token }) {
+  const response = await fetch(postsHost, {
     method: "GET",
     headers: {
       Authorization: token,
     },
-  })
-    .then((response) => {
-      if (response.status === 401) {
-        throw new Error("Нет авторизации");
-      }
-      if (!response.ok) {
-        throw new Error("Ошибка при получении постов");
-      }
-      return response.json();
-    })
-    .then((data) => {
-      console.log("Данные с API:", data);
-      return data.posts.map((post) => ({
-        ...post,
-        text: post.text || post.description,
-        isLiked: post.isLiked, // Берем актуальное значение с сервера
-        likes: {
-          counter: post.likes ? post.likes.counter : 0,
-        },
-      }));
-    });
+  });
+
+  if (response.status === 401) {
+    throw new Error("Нет авторизации");
+  }
+  if (!response.ok) {
+    throw new Error("Ошибка при получении постов");
+  }
+
+  const data = await response.json();
+  console.log("Данные с API:", data);
+
+  return data.posts.map((post) => ({
+    ...post,
+    text: post.text || post.description,
+    isLiked: post.likes.some((like) => like.user.id === getUserId()), // Проверяем, лайкал ли текущий пользователь
+    likes: {
+      counter: post.likes.length,
+      users: post.likes.map((like) => like.user.name),
+    },
+  }));
+}
+
+// Функция для получения ID текущего пользователя
+function getUserId() {
+  const user = JSON.parse(localStorage.getItem("user")) || {};
+  return user.id;
 }
 
 export function registerUser({ login, password, name, imageUrl }) {
@@ -104,6 +110,7 @@ export function setLike(postId, token) {
     method: "POST",
     headers: {
       Authorization: token,
+      "Content-Type": "application/json",
     },
   })
     .then((response) => {
@@ -112,7 +119,7 @@ export function setLike(postId, token) {
       }
       return response.json();
     })
-    .then((data) => data);
+    .then((data) => data.post); // Возвращаем обновленный пост
 }
 
 export function removeLike(postId, token) {
@@ -120,6 +127,7 @@ export function removeLike(postId, token) {
     method: "POST",
     headers: {
       Authorization: token,
+      "Content-Type": "application/json",
     },
   })
     .then((response) => {
@@ -128,5 +136,5 @@ export function removeLike(postId, token) {
       }
       return response.json();
     })
-    .then((data) => data);
+    .then((data) => data.post); // Возвращаем обновленный пост
 }
