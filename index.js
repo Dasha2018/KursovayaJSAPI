@@ -21,6 +21,10 @@ export let user = getUserFromLocalStorage();
 export let page = null;
 export let posts = [];
 
+export const updatePosts = (newPosts) => {
+  posts = newPosts;
+};
+
 export const getToken = () => {
   const token = user ? `Bearer ${user.token}` : undefined;
 
@@ -48,7 +52,15 @@ export const goToPage = (newPage, data) => {
     if (newPage === POSTS_PAGE) {
       page = LOADING_PAGE;
       renderApp();
-
+    
+      const savedPosts = JSON.parse(localStorage.getItem("posts"));
+    
+      if (savedPosts) {
+        page = POSTS_PAGE;
+        posts = savedPosts;
+        renderApp();
+      }
+    
       return getPosts({ token: getToken() })
         .then((newPosts) => {
           page = POSTS_PAGE;
@@ -60,6 +72,7 @@ export const goToPage = (newPage, data) => {
           goToPage(POSTS_PAGE);
         });
     }
+    
 
     if (newPage === USER_POSTS_PAGE) {
       page = USER_POSTS_PAGE;
@@ -137,6 +150,7 @@ const renderApp = () => {
   if (page === POSTS_PAGE) {
     return renderPostsPageComponent({
       appEl,
+      posts,
     });
   }
 

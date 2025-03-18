@@ -23,16 +23,16 @@ export async function getPosts({ token }) {
   return data.posts.map((post) => ({
     ...post,
     text: post.text || post.description,
-    isLiked: post.likes.some((like) => like.user.id === getUserId()), // Проверяем, лайкал ли текущий пользователь
+    isLiked: post.likes.some((like) => like.user?.id === getUserId()),
     likes: {
-      counter: post.likes.length,
-      users: post.likes.map((like) => like.user.name),
+      counter: post.likes.length, // Инициализируем counter
+      users: post.likes.map((like) => like.user),
     },
   }));
 }
 
 // Функция для получения ID текущего пользователя
-function getUserId() {
+export function getUserId() {
   const user = JSON.parse(localStorage.getItem("user")) || {};
   return user.id;
 }
@@ -105,36 +105,32 @@ export function addPost({ description, imageUrl, token }) {
   });
 }
 
-export function setLike(postId, token) {
-  return fetch(`${postsHost}/${postId}/like`, {
+export async function setLike({ postId, token }) {
+  const response = await fetch(`${postsHost}/${postId}/like`, {
     method: "POST",
     headers: {
       Authorization: token,
-      "Content-Type": "application/json",
     },
-  })
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error("Ошибка при добавлении лайка");
-      }
-      return response.json();
-    })
-    .then((data) => data.post); // Возвращаем обновленный пост
+  });
+
+  if (!response.ok) {
+    throw new Error("Ошибка при добавлении лайка");
+  }
+
+  return response.json();
 }
 
-export function removeLike(postId, token) {
-  return fetch(`${postsHost}/${postId}/dislike`, {
+export async function removeLike({ postId, token }) {
+  const response = await fetch(`${postsHost}/${postId}/dislike`, {
     method: "POST",
     headers: {
       Authorization: token,
-      "Content-Type": "application/json",
     },
-  })
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error("Ошибка при удалении лайка");
-      }
-      return response.json();
-    })
-    .then((data) => data.post); // Возвращаем обновленный пост
+  });
+
+  if (!response.ok) {
+    throw new Error("Ошибка при удалении лайка");
+  }
+
+  return response.json();
 }

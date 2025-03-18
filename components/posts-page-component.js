@@ -1,28 +1,29 @@
 import { USER_POSTS_PAGE } from "../routes";
 import { renderHeaderComponent } from "./header-component";
-import { posts, goToPage, getToken } from "../index";
+import { goToPage, getToken } from "../index";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale/ru";
-import { setLike, removeLike } from "../api";
+import { setLike, removeLike, getPosts } from "../api";
 
 /**
  * Рендерит страницу с постами.
  * @param {HTMLElement} appEl - Элемент, в который рендерится страница.
  */
-export function renderPostsPageComponent({ appEl }) {
+export function renderPostsPageComponent({ appEl, posts }) {
+  if (!posts || !Array.isArray(posts)) {
+    console.error("Posts is not defined or not an array");
+    return;
+  }
+
   const postsHtml = posts
     .map((post) => {
-      // Важно: инициализируем isLiked и counter, если их нет
-      post.isLiked = post.isLiked || false;
-      post.likes.counter = post.likes.counter || 0;
-
       return `
         <li class="post" data-post-id="${post.id}">
           <div class="post-header" data-user-id="${post.user.id}">
-              <img src="${
-                post.user.imageUrl
-              }" class="post-header__user-image" alt="${post.user.name}">
-              <p class="post-header__user-name">${post.user.name}</p>
+            <img src="${
+              post.user.imageUrl
+            }" class="post-header__user-image" alt="${post.user.name}">
+            <p class="post-header__user-name">${post.user.name}</p>
           </div>
           <div class="post-image-container">
             <img class="post-image" src="${
@@ -62,7 +63,7 @@ export function renderPostsPageComponent({ appEl }) {
   renderHeaderComponent({
     element: document.querySelector(".header-container"),
   });
-
+  // Обработчик кликов на заголовок поста (переход в профиль)
   for (let userEl of document.querySelectorAll(".post-header")) {
     userEl.addEventListener("click", () => {
       goToPage(USER_POSTS_PAGE, {
@@ -71,58 +72,40 @@ export function renderPostsPageComponent({ appEl }) {
     });
   }
 
-  function updatePostLikes(postId) {
-    const post = posts.find((p) => p.id === postId);
-    if (!post) return;
-
-    const postElement = document.querySelector(`[data-post-id='${postId}']`);
-    if (!postElement) return;
-
-    const likeButton = postElement.querySelector(".like-button");
-    const likeText = postElement.querySelector(".post-likes-text");
-
-    likeButton.querySelector("img").src = `./assets/images/${
-      post.isLiked ? "like-active" : "like-not-active"
-    }.svg`;
-
-    const likedUsers = post.likes.users.length
-      ? `: ${post.likes.users.join(", ")}`
-      : "";
-    likeText.textContent = `Нравится: ${post.likes.counter}${likedUsers}`;
-  }
-
-  // Обработчик кликов на кнопки лайков
+  // Добавляем обработчики событий для кнопок лайков
   for (let likeButton of document.querySelectorAll(".like-button")) {
     likeButton.addEventListener("click", async (event) => {
-      event.stopPropagation();
+      event.preventDefault();
       const postId = likeButton.dataset.postId;
+      const post = posts.find((post) => post.id.toString() === postId); // Находим пост
       const token = getToken();
+
       if (!token) {
         alert("Вы не авторизованы. Пожалуйста, войдите в систему.");
         return;
       }
 
       try {
-        let post = posts.find((p) => p.id === postId);
-        if (!post) return;
-
-        let updatedPost;
+        // Если пост лайкнут, снимаем лайк, иначе ставим лайк
         if (post.isLiked) {
-          updatedPost = await removeLike(postId, token);
+          await removeLike({ postId, token });
+          post.isLiked = false;
+          post.likes.counter--; // Уменьшаем счетчик
         } else {
-          updatedPost = await setLike(postId, token);
+          await setLike({ postId, token });
+          post.isLiked = true;
+          post.likes.counter++; // Увеличиваем счетчик
         }
 
-        // Обновляем пост с сервера
-        post.isLiked = updatedPost.likes.some(
-          (like) => like.user.id === getUserId()
-        );
-        post.likes.counter = updatedPost.likes.length;
-        post.likes.users = updatedPost.likes.map((like) => like.user.name);
+        // Обновляем UI
+        renderPostsPageComponent({ appEl, posts });
 
-        updatePostLikes(postId);
+        // Опционально: Получаем актуальные данные с сервера
+        // const updatedPosts = await getPosts({ token });
+        // posts.splice(0, posts.length, ...updatedPosts);
+        // renderPostsPageComponent({ appEl, posts });
       } catch (error) {
-        console.error("Ошибка при обновлении лайков:", error.message);
+        console.error("Ошибка при изменении лайка:", error);
       }
     });
   }
