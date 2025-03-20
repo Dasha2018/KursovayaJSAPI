@@ -11,27 +11,10 @@ import { renderHeaderComponent } from "./header-component.js";
  *                                            Принимает один аргумент - новый URL изображения или пустую строку.
  */
 export function renderUploadImageComponent({ element, onImageUrlChange }) {
-  /**
-   * URL текущего изображения.
-   * Изначально пуст, пока пользователь не загрузит изображение.
-   * @type {string}
-   */
   let imageUrl = "";
 
-  /**
-   * Функция рендеринга компонента.
-   * Отображает интерфейс компонента в зависимости от состояния:
-   * либо форма выбора файла, либо превью загруженного изображения с кнопкой замены.
-   */
-
-  /* renderHeaderComponent({
-    element: document.querySelector(".header-container"),
-  }); */
   const render = () => {
     element.innerHTML = `
-
-    
-    
       <div class="upload-image">
         ${
           imageUrl
@@ -58,34 +41,51 @@ export function renderUploadImageComponent({ element, onImageUrlChange }) {
       element: document.querySelector(".header-container"),
     });
 
-    // Обработчик выбора файла
     const fileInputElement = element.querySelector(".file-upload-input");
     fileInputElement?.addEventListener("change", () => {
       const file = fileInputElement.files[0];
       if (file) {
         const labelEl = document.querySelector(".file-upload-label");
+
+        // Проверяем тип файла
+        const validImageTypes = [
+          "image/jpeg",
+          "image/png",
+          "image/gif",
+          "image/webp",
+        ];
+        if (!validImageTypes.includes(file.type)) {
+          alert("Пожалуйста, выберите изображение (jpg, png, gif, webp)");
+          return; // Прерываем выполнение, если файл не соответствует типу
+        }
+
         labelEl.setAttribute("disabled", true);
         labelEl.textContent = "Загружаю файл...";
 
-        // Загружаем изображение с помощью API
-        uploadImage({ file }).then(({ fileUrl }) => {
-          imageUrl = fileUrl; // Сохраняем URL загруженного изображения
-          onImageUrlChange(imageUrl); // Уведомляем о изменении URL изображения
-          render(); // Перерисовываем компонент с новым состоянием
-        });
+        uploadImage({ file })
+          .then(({ fileUrl }) => {
+            imageUrl = fileUrl;
+            onImageUrlChange(imageUrl);
+            render();
+          })
+          .catch((error) => {
+            labelEl.textContent = "Ошибка при загрузке файла"; // Отображаем сообщение об ошибке
+            console.error(error);
+          })
+          .finally(() => {
+            labelEl.removeAttribute("disabled"); // Снимаем блокировку с кнопки
+          });
       }
     });
 
-    // Обработчик удаления изображения
     element
       .querySelector(".file-upload-remove-button")
       ?.addEventListener("click", () => {
-        imageUrl = ""; // Сбрасываем URL изображения
-        onImageUrlChange(imageUrl); // Уведомляем об изменении URL изображения
-        render(); // Перерисовываем компонент
+        imageUrl = "";
+        onImageUrlChange(imageUrl);
+        render();
       });
   };
 
-  // Инициализация компонента
   render();
 }

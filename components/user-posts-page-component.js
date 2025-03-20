@@ -5,6 +5,23 @@ import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale/ru";
 import { renderPostsPageComponent } from "./posts-page-component.js";
 
+function updatePostInDOM(post) {
+  const postElement = document.querySelector(
+    `.post[data-post-id="${post.id}"]`
+  );
+  if (!postElement) return;
+
+  // Обновляем количество лайков
+  const likeCountElement = postElement.querySelector(".post-likes-text strong");
+  likeCountElement.textContent = post.likes.length;
+
+  // Обновляем изображение лайка
+  const likeButtonImage = postElement.querySelector(".like-button img");
+  likeButtonImage.src = `./assets/images/${
+    post.isLiked ? "like-active" : "like-not-active"
+  }.svg`;
+}
+
 export function renderUserPostsPageComponent({ appEl, userId, user }) {
   appEl.innerHTML = "Загрузка постов...";
 
@@ -12,11 +29,16 @@ export function renderUserPostsPageComponent({ appEl, userId, user }) {
 
   getPosts({ token })
     .then((posts) => {
-      const userPosts = posts.filter((post) => post.user.id === userId);
+      const userPosts = Array.isArray(posts)
+        ? posts.filter((post) => post.user.id === userId)
+        : [];
 
       const postsHtml = userPosts
-  .map((post) => {
-    return `
+        .map((post) => {
+          const postText = post.description || "Нет описания"; // Если description отсутствует, выводим "Нет описания"
+          const likeCount = post.likes?.length || 0; // Количество лайков равно длине массива likes
+          const isLiked = post.isLiked || false; // Состояние лайка
+          return `
       <li class="post" data-post-id="${post.id}">
         <div class="post-header" data-user-id="${post.user.id}">
             <img src="${post.user.imageUrl}" 
@@ -35,23 +57,20 @@ export function renderUserPostsPageComponent({ appEl, userId, user }) {
             }.svg" alt="Кнопка лайка">
           </button>
           <p class="post-likes-text">
-            Нравится: <strong>${post.likes.counter}</strong>
+            Нравится: <strong>${likeCount}</strong>
           </p>
         </div>
         <p class="post-text">
           <span class="user-name">${post.user.name}</span>
-          ${post.text}
+          ${post.description}
         </p>
-        <p class="post-date">${formatDistanceToNow(
-          new Date(post.createdAt),
-          {
-            addSuffix: true,
-            locale: ru,
-          }
-        )}</p>
+        <p class="post-date">${formatDistanceToNow(new Date(post.createdAt), {
+          addSuffix: true,
+          locale: ru,
+        })}</p>
       </li>`;
-  })
-  .join("");
+        })
+        .join("");
 
       appEl.innerHTML = `
           <div class="page-container">
@@ -68,41 +87,36 @@ export function renderUserPostsPageComponent({ appEl, userId, user }) {
       for (let likeButton of document.querySelectorAll(".like-button")) {
         likeButton.addEventListener("click", async (event) => {
           event.preventDefault();
-          const postId = likeButton.dataset.postId; // Получаем postId
-          const post = posts.find((post) => post.id.toString() === postId); // Находим пост
+          const postId = likeButton.dataset.postId;
+          const post = posts.find((post) => post.id === postId); // Находим пост
           const token = getToken();
-      
+
           if (!token) {
             alert("Вы не авторизованы. Пожалуйста, войдите в систему.");
             return;
           }
-      
-          if (!post) { // Проверяем, что пост существует
-            console.error(`Пост с id ${postId} не найден.`);
-            return;
-          }
-      
+
           try {
             // Если пост лайкнут, снимаем лайк, иначе ставим лайк
             if (post.isLiked) {
               await removeLike({ postId, token });
               post.isLiked = false;
-              post.likes.counter--; // Уменьшаем счетчик
+              post.likes = post.likes.filter(
+                (like) => like.id !== post.user.id
+              ); // Удаляем лайк текущего пользователя
             } else {
               await setLike({ postId, token });
               post.isLiked = true;
-              post.likes.counter++; // Увеличиваем счетчик
+              post.likes.push({ id: post.user.id, name: post.user.name }); // Добавляем лайк текущего пользователя
             }
-      
-            // Обновляем UI
-            renderPostsPageComponent({ appEl, posts });
-      
+
+            // Обновляем только измененный пост
+            updatePostInDOM(post);
           } catch (error) {
             console.error("Ошибка при изменении лайка:", error);
           }
         });
-      }    
-      
+      }
     })
     .catch((error) => {
       console.error("Ошибка загрузки постов:", error);
