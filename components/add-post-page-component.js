@@ -1,5 +1,13 @@
 import { renderUploadImageComponent } from "./upload-image-component.js";
 
+export function escapeHtml(unsafe) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
 export function renderAddPostPageComponent({ appEl, onAddPostClick }) {
   const render = () => {
@@ -47,9 +55,15 @@ export function renderAddPostPageComponent({ appEl, onAddPostClick }) {
         return;
       }
 
+      // Экранируем описание
+      const safeDescription = escapeHtml(description);
+
       // Передаем данные в функцию-обработчик
-      console.log("Добавляем пост:", { description, imageUrl });
-      onAddPostClick({ description, imageUrl });
+      console.log("Добавляем пост:", {
+        description: safeDescription,
+        imageUrl,
+      });
+      onAddPostClick({ description: safeDescription, imageUrl });
     });
   };
 

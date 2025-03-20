@@ -2,30 +2,39 @@ const personalKey = "daria-2025";
 const baseHost = "https://wedev-api.sky.pro";
 const postsHost = `${baseHost}/api/v1/${personalKey}/instapro`;
 
-export function getPosts({ token }) {
-  return fetch(postsHost, {
+export async function getPosts({ token }) {
+  const response = await fetch(postsHost, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: token,
     },
-  })
-    .then((response) => {
-      if (response.status === 401) {
-        throw new Error("Нет авторизации");
-      }
-      if (!response.ok) {
-        throw new Error("Ошибка при получении постов");
-      }
+  });
 
-      return response.json();
-    })
-    .then((data) => {
-      console.log("Данные с API:", data);
-      return data.posts.map((post) => ({
-        ...post,
-        text: post.text || post.description,
-      }));
-    });
+  if (response.status === 401) {
+    throw new Error("Нет авторизации");
+  }
+  if (!response.ok) {
+    throw new Error("Ошибка при получении постов");
+  }
+
+  const data = await response.json();
+  console.log("Данные с API:", data);
+
+  return data.posts.map((post) => ({
+    ...post,
+    text: post.text || post.description,
+    isLiked: post.likes.some((like) => like.user?.id === getUserId()),
+    likes: {
+      counter: post.likes.length, // Инициализируем counter
+      users: post.likes.map((like) => like.user),
+    },
+  }));
+}
+
+// Функция для получения ID текущего пользователя
+export function getUserId() {
+  const user = JSON.parse(localStorage.getItem("user")) || {};
+  return user.id;
 }
 
 export function registerUser({ login, password, name, imageUrl }) {
@@ -52,18 +61,12 @@ export function loginUser({ login, password }) {
       login,
       password,
     }),
-  })
-    .then((response) => {
-      if (response.status === 400) {
-        throw new Error("Неверный логин или пароль");
-      }
-      return response.json();
-    })
-    .then((data) => {
-      // Сохраняем токен в localStorage
-      localStorage.setItem("authToken", data.token);
-      return data;
-    });
+  }).then((response) => {
+    if (response.status === 400) {
+      throw new Error("Неверный логин или пароль");
+    }
+    return response.json();
+  });
 }
 
 export function uploadImage({ file }) {
@@ -100,4 +103,34 @@ export function addPost({ description, imageUrl, token }) {
     }
     return response.json();
   });
+}
+
+export async function setLike({ postId, token }) {
+  const response = await fetch(`${postsHost}/${postId}/like`, {
+    method: "POST",
+    headers: {
+      Authorization: token,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Ошибка при добавлении лайка");
+  }
+
+  return response.json();
+}
+
+export async function removeLike({ postId, token }) {
+  const response = await fetch(`${postsHost}/${postId}/dislike`, {
+    method: "POST",
+    headers: {
+      Authorization: token,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Ошибка при удалении лайка");
+  }
+
+  return response.json();
 }

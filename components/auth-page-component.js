@@ -1,8 +1,7 @@
 import { renderHeaderComponent } from "./header-component.js";
 import { renderUploadImageComponent } from "./upload-image-component.js";
 import { registerUser, loginUser } from "../api.js";
-/* import { POSTS_PAGE } from "../routes.js"; // Добавляем переход на главную страницу после входа
-import { goToPage } from "../index.js"; */
+import { escapeHtml } from "./add-post-page-component.js";
 
 /**
  * Компонент страницы авторизации.
@@ -117,7 +116,7 @@ export function renderAuthPageComponent({ appEl, setUser }) {
           return;
         }
 
-        loginUser({ login, password })
+        loginUser({ login: escapeHtml(login), password: escapeHtml(password) })
           .then((user) => {
             setUser(user.user);
           })
