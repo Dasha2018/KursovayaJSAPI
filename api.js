@@ -2,33 +2,23 @@ const personalKey = "daria-2025";
 const baseHost = "https://wedev-api.sky.pro";
 const postsHost = `${baseHost}/api/v1/${personalKey}/instapro`;
 
-export async function getPosts({ token }) {
-  const response = await fetch(postsHost, {
+export function getPosts({ token }) {
+  return fetch(postsHost, {
     method: "GET",
     headers: {
       Authorization: token,
     },
-  });
-
-  if (response.status === 401) {
-    throw new Error("Нет авторизации");
-  }
-  if (!response.ok) {
-    throw new Error("Ошибка при получении постов");
-  }
-
-  const data = await response.json();
-  console.log("Данные с API:", data);
-
-  return data.posts.map((post) => ({
-    ...post,
-    text: post.text || post.description,
-    isLiked: post.likes.some((like) => like.user?.id === getUserId()),
-    likes: {
-      counter: post.likes.length, // Инициализируем counter
-      users: post.likes.map((like) => like.user),
-    },
-  }));
+  })
+    .then((response) => {
+      if (response.status === 401) {
+        throw new Error("Нет авторизации");
+      }
+      return response.json();
+    })
+    .then((data) => {
+      console.log("Данные, полученные с API:", data);
+      return data.posts;
+    });
 }
 
 // Функция для получения ID текущего пользователя
